@@ -1,0 +1,23 @@
+﻿@* @page "/signout" *@
+@inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.Components.Authorization
+
+<button @onclick="SignOutAsync">Sign Out</button>
+
+@code {
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; }
+
+    private async Task SignOutAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo($"MicrosoftIdentity/Account/SignOut", forceLoad: true);
+            NavigationManager.NavigateTo("/");
+
+        }
+    }
+}

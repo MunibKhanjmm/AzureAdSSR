@@ -1,0 +1,45 @@
+﻿@* <AuthorizeView>
+    <Authorized>
+        Hello, @context.User.Identity?.Name!
+        <a href="MicrosoftIdentity/Account/SignOut">Log out</a>
+    </Authorized>
+    <NotAuthorized>
+        <a href="MicrosoftIdentity/Account/SignIn">Log in</a>
+    </NotAuthorized>
+</AuthorizeView> *@
+
+
+@inject NavigationManager Nav
+
+<AuthorizeView>
+    <Authorized>
+        Hello, @context.User.Identity?.Name!
+        <button class="nav-link btn btn-link" @onclick="BeginLogOut">Log out</button>
+    </Authorized>
+    <NotAuthorized>
+        <a class="nav-link btn btn-link" @onclick="BeginLogin">Log in</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; }
+
+    public async Task BeginLogin()
+    {
+        Nav.NavigateTo("MicrosoftIdentity/Account/SignIn");
+    }
+
+    public async Task BeginLogOut()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            Nav.NavigateTo($"MicrosoftIdentity/Account/SignOut", forceLoad: true);
+            Nav.NavigateTo("/");
+
+        }
+    }
+}
