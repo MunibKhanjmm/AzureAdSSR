@@ -1,0 +1,194 @@
+﻿@page "/calendar2"
+@using Microsoft.Graph
+@using Microsoft.Identity.Web
+@using System.Net.Http.Headers
+@inject ITokenAcquisition TokenAcquisition
+
+<SfSchedule TValue="Meeting" SelectedDate="@(DateTime.Today)" CurrentView="View.Month">
+    <ScheduleViews>
+        <ScheduleView Option="View.Day" StartHour="07:00" EndHour="15:00"></ScheduleView>
+        <ScheduleView Option="View.Week" StartHour="10:00" EndHour="18:00"></ScheduleView>
+        <ScheduleView Option="View.Month" ShowWeekend="false"></ScheduleView>
+    </ScheduleViews>
+    <ScheduleEventSettings DataSource="@Meetings">
+        <ScheduleField Id="EventID">
+            <FieldSubject Name="EventName"></FieldSubject>
+            <FieldStartTime Name="From"></FieldStartTime>
+            <FieldEndTime Name="To"></FieldEndTime>
+        </ScheduleField>
+    </ScheduleEventSettings>
+</SfSchedule>
+
+@code {
+    List<Meeting> Meetings = new List<Meeting>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var accessToken = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.Read" });
+
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                var graphServiceClient = new GraphServiceClient(
+                    new DelegateAuthenticationProvider(
+                        async (requestMessage) =>
+                        {
+                            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                        }));
+
+                var events = await graphServiceClient.Me.Events.Request().GetAsync();
+
+                if (events != null && events.Count > 0)
+                {
+                    foreach (var appointment in events)
+                    {
+                        Meeting meeting = new Meeting()
+                        {
+                                EventName = appointment.Subject,
+                                From = Convert.ToDateTime(appointment.Start.DateTime),
+                                To = Convert.ToDateTime(appointment.End.DateTime),
+                                IsAllDay = (bool)appointment.IsAllDay
+                        };
+
+                        Meetings.Add(meeting);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log or display error message to users
+            Console.WriteLine($"An error occurred while fetching calendar events: {ex.Message}");
+        }
+    }
+
+    public class Meeting
+    {
+        public string EventName { get; set; }
+        public DateTime From { get; set; }
+        public DateTime To { get; set; }
+        public bool IsAllDay { get; set; }
+    }
+}
+
+
+
+
+
+@* <SfSchedule TValue="AppointmentData" SelectedDate="@(DateTime.Today)" CurrentView="View.Month">
+    <ScheduleViews>
+        <ScheduleView Option="View.Day" StartHour="07:00" EndHour="15:00"></ScheduleView>
+        <ScheduleView Option="View.Week" StartHour="10:00" EndHour="18:00"></ScheduleView>
+        <ScheduleView Option="View.Month" ShowWeekend="false"></ScheduleView>
+    </ScheduleViews>
+    <ScheduleEventSettings DataSource="@DataSource">
+        <ScheduleField Id="EventID">
+            <FieldSubject Name="EventSubject"></FieldSubject>
+            <FieldStartTime Name="EventStart"></FieldStartTime>
+            <FieldEndTime Name="EventEnd"></FieldEndTime>
+        </ScheduleField>
+    </ScheduleEventSettings>
+</SfSchedule>
+
+
+ *@
+
+@* @code {
+    List<AppointmentData> DataSource = new List<AppointmentData>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var accessToken = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.Read" });
+
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                var graphServiceClient = new GraphServiceClient(
+                    new DelegateAuthenticationProvider(
+                        async (requestMessage) =>
+                        {
+                            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                        }));
+
+                var events = await graphServiceClient.Me.Events
+                    .Request()
+                    .Select(e => new { e.Subject, e.Start, e.End })
+                    .GetAsync();
+
+                foreach (var graphEvent in events)
+                {
+                    DataSource.Add(new AppointmentData
+                        {
+                            EventSubject = graphEvent.Subject,
+                            EventStart = DateTime.Parse(graphEvent.Start.DateTime),
+                            EventEnd = DateTime.Parse(graphEvent.End.DateTime)
+                        });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred while fetching calendar events: {ex.Message}");
+        }
+    }
+
+    public class AppointmentData
+    {
+        public string EventSubject { get; set; }
+        public DateTime EventStart { get; set; }
+        public DateTime EventEnd { get; set; }
+    }
+}
+ *@
+
+
+@* @code {
+    List<AppointmentData> DataSource = new List<AppointmentData>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var accessToken = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.Read" });
+
+        if (!string.IsNullOrEmpty(accessToken))
+        {
+            var graphServiceClient = new GraphServiceClient(
+                new DelegateAuthenticationProvider(
+                    async (requestMessage) =>
+                    {
+                        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                    }));
+
+            try
+            {
+                var events = await graphServiceClient.Me.Calendar.Events
+                    .Request()
+                    .Select(e => new { e.Subject, e.Start, e.End })
+                    .GetAsync();
+
+                foreach (var graphEvent in events)
+                {
+                    DataSource.Add(new AppointmentData
+                        {
+                            EventSubject = graphEvent.Subject,
+                            EventStart = DateTime.Parse(graphEvent.Start.DateTime),
+                            EventEnd = DateTime.Parse(graphEvent.End.DateTime)
+                        });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while fetching calendar events: {ex.Message}");
+            }
+        }
+    }
+
+    public class AppointmentData
+    {
+        public string EventSubject { get; set; }
+        public DateTime EventStart { get; set; }
+        public DateTime EventEnd { get; set; }
+    }
+}
+ *@
