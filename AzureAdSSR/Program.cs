@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web.UI;
 using Microsoft.Identity.Web;
 using Syncfusion.Blazor;
+using Microsoft.Graph.ExternalConnectors;
+using AzureAdSSR.AccessToken;
+using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 
 namespace AzureAdSSR
 {
@@ -20,14 +25,25 @@ namespace AzureAdSSR
                 .AddInteractiveServerComponents();
 
             // Add services to the container.
-            builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
-               .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
-               .EnableTokenAcquisitionToCallDownstreamApi(initialScopes)
-               .AddMicrosoftGraph(builder.Configuration.GetSection("MicrosoftGraph"))
-               .AddInMemoryTokenCaches();
+            //builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+            //   .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
+            //   .EnableTokenAcquisitionToCallDownstreamApi(initialScopes)
+            //   .AddMicrosoftGraph(builder.Configuration.GetSection("initialScopes"))
+            //   .AddInMemoryTokenCaches();
+            builder.Services.AddMicrosoftIdentityWebAppAuthentication(builder.Configuration)
+            .EnableTokenAcquisitionToCallDownstreamApi(new[] { "Calendars.Read", "Calendars.ReadWrite" })
+            .AddMicrosoftGraph(builder.Configuration.GetSection("MicrosoftGraph"))
+            .AddInMemoryTokenCaches();
 
-            builder.Services.AddControllersWithViews()
-                .AddMicrosoftIdentityUI();
+            //builder.Services.AddScoped<TokenProvider>();
+
+            builder.Services.AddControllersWithViews(options =>
+            {
+                var policy = new AuthorizationPolicyBuilder()
+                                 .RequireAuthenticatedUser()
+                                 .Build();
+                options.Filters.Add(new AuthorizeFilter(policy));
+            }).AddMicrosoftIdentityUI();
 
             builder.Services.AddRazorPages();
 

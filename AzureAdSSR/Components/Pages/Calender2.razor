@@ -1,10 +1,12 @@
-﻿@page "/calendar2"
+﻿@*  @page "/calendar2"
 @using Microsoft.Graph
 @using Microsoft.Identity.Web
 @using System.Net.Http.Headers
-@inject ITokenAcquisition TokenAcquisition
+@using Newtonsoft.Json
+@using Newtonsoft.Json.Linq
+@inject ITokenAcquisition TokenAcquisition *@
 
-<SfSchedule TValue="Meeting" SelectedDate="@(DateTime.Today)" CurrentView="View.Month">
+@* <SfSchedule TValue="Meeting" SelectedDate="@(DateTime.Today)" CurrentView="View.Month">
     <ScheduleViews>
         <ScheduleView Option="View.Day" StartHour="07:00" EndHour="15:00"></ScheduleView>
         <ScheduleView Option="View.Week" StartHour="10:00" EndHour="18:00"></ScheduleView>
@@ -26,7 +28,8 @@
     {
         try
         {
-            var accessToken = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.Read" });
+            var accessToken = "EwCAA8l6BAAUs5+HQn0N+h2FxWzLS31ZgQVuHsYAAXiDktTefR5YaWvdh1xBzFZBgoZRmD9n3yFE+BZJhin0HfIRV316ZUxsg+OocKsMPSjFCCfUc9DFTqC+NX8PWMV0n6gZk2IIrIEnqSHPyUUPAxi0Otw4LL9jbIyoVWfP5wVNFk8/yX+6Gr5HEvSjXfLbLKjRjTVBybsmLcnJv86nzy/jUrXNeihJ7PYXmOn0yqcfCHd74+F16/RA2vXqyOwHwWxFLgqgJclwQpYTgCm1ZP/C0q3LHuqJhke23LprNHmfBK7pdxABVFSCr8ZTEDTF4xOPHWbNEJYWvmqE/dNQMIaEy+UnX5OYYUwtdo3lQOsBCuZb/wXSUgZFzvpJXBwDZgAACH//ikfi1cOwUALhejhvJJbkK1SyyzUigK+R9GOiDJrsnsRZaKxy6+ZKX9RIytH4KpxsEO5fRlXTvdtlsC1oTKsSD3lWMnbgiSjSgC53zwploySdMNBIFs2BAj9L2B05731YlxOH8uv3/Dhbf5JUCrCyJVzfnxCZ0wzVxQCE5hAXURphZDDwv1bNiE0PbocXpp36/o/aZ2govYYO6CitjEAgKRdT7RQDEgFq+JBh+3iNNyHQ0d4sOpfcw03do/S6zM8xlsUaAkbejOp5x3+UGF4w+vb+A0XtAUl1OMXpLdLty8wWIR2XYa5c5IK4Q3Z96aFoLxww2acTn1piI0CJTRhjBLh/LeCHuLEDsVTrX9ACZUvEOZe9c9cLlEvTQWFGzmlu7RKphk79LP46y+iOF6rODATY+zMSGT/WGNkzRLhVcmajqAYfvb12hbs3nr1Xf8ruVOrjHqOqMwATf0LgGFlwM0dDmId8I+OICqB8jTJxi9rdyXlTmU652SljJPNgTGOar/7G3ylfQju9m6hT+reaymS/qYDfs+//bhlfNp/m2ZTiQzMox4AlLbx2KdG1yAq0W/F8AyrOGnasgcyxD5dZFRc/lDqX56aaWAlOXU48KHNddw9XpbvFET7WIGXuOWJcMy/QmR2CjIfWNAiw5mjNLr6OOOaZASk4oiZ1t1B68vm//kAvJyqQGVk2tal2/yDhWDtKgHYxDLriDzZhYUdBu1c0FC2tXvHW3fDpZZ+Tvr3hF0rszAb5nrP/+a+go/Af2CUQwmjpYAU8+W6xo9+LKr2RhJNxCz/HiAI=";
+            //await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.Read" });
 
             if (!string.IsNullOrEmpty(accessToken))
             {
@@ -71,124 +74,552 @@
         public bool IsAllDay { get; set; }
     }
 }
+ *@
 
 
+@* @using System.Text
+@using Syncfusion.Blazor.Schedule.Internal
+@inject IHttpClientFactory HttpClientFactory
 
-
-
-@* <SfSchedule TValue="AppointmentData" SelectedDate="@(DateTime.Today)" CurrentView="View.Month">
+<SfSchedule TValue="AppointmentData" SelectedDate="@(new DateTime(2024, 2, 5))" CurrentView="View.Month">
     <ScheduleViews>
         <ScheduleView Option="View.Day" StartHour="07:00" EndHour="15:00"></ScheduleView>
         <ScheduleView Option="View.Week" StartHour="10:00" EndHour="18:00"></ScheduleView>
         <ScheduleView Option="View.Month" ShowWeekend="false"></ScheduleView>
     </ScheduleViews>
+    <ScheduleEvents TValue="AppointmentData" ActionCompleted="OnActionCompleted"></ScheduleEvents>
     <ScheduleEventSettings DataSource="@DataSource">
-        <ScheduleField Id="EventID">
-            <FieldSubject Name="EventSubject"></FieldSubject>
-            <FieldStartTime Name="EventStart"></FieldStartTime>
-            <FieldEndTime Name="EventEnd"></FieldEndTime>
+        <ScheduleField Id="Id">
+            <FieldSubject Name="Subject"></FieldSubject>
+            <FieldStartTime Name="Start"></FieldStartTime>
+            <FieldEndTime Name="End"></FieldEndTime>
+            <FieldDescription Name="Description"></FieldDescription>
+            <FieldLocation Name="Location"></FieldLocation>
+            <FieldIsAllDay Name="IsAllDay"></FieldIsAllDay>
+            <!-- Add other necessary field mappings here -->
+        </ScheduleField>
+    </ScheduleEventSettings>
+
+
+     For remote data, uncomment and make use of the below ScheduleEventSettings and remove the previous ScheduleEventSetting
+    <ScheduleEventSettings TValue="AppointmentData">
+    <SfDataManager Url="https://js.syncfusion.com/demos/ejservices/api/Schedule/LoadData" Adaptor="@Syncfusion.Blazor.Adaptors.WebApiAdaptor">
+    </SfDataManager>
+    </ScheduleEventSettings>
+
+</SfSchedule>  *@
+
+@* @code {
+    private HttpClient httpClient;
+    string DisplayName = string.Empty;
+    List<AppointmentData> DataSource = new List<AppointmentData>();
+
+    string Status = "";
+    public async Task OnActionCompleted(ActionEventArgs<AppointmentData> args)
+    {
+        if (args.ActionType == ActionType.EventCreate)
+        {
+            Status = "0";
+            await OnCreated(args.AddedRecords);
+        }
+        if (args.ActionType == ActionType.EventChange)
+        {
+            await OnChanged(args.ChangedRecords);
+            Status = "1";
+        }
+        if (args.ActionType == ActionType.EventRemove)
+        {
+            Status = "Success";
+            await DeleteEvent(args.DeletedRecords);
+        }
+    }
+    public async Task OnCreated(AppointmentData appointment)
+    {
+        // Format dates according to the desired structure
+        var formattedStart = appointment.Start.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+        var formattedEnd = appointment.End.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+
+        var json = JsonConvert.SerializeObject(new
+        {
+            subject = appointment.Subject,
+            start = new
+            {
+                dateTime = formattedStart,
+                timeZone = appointment.Start.ToString("zzz")
+            },
+            end = new
+            {
+                dateTime = formattedEnd,
+                timeZone = appointment.End.ToString("zzz")
+            },
+            // description = newEvent.Description,
+            location = new
+            {
+                displayname = appointment.Location
+            }
+            // IsAllDay    = newEvent.IsAllDay
+        });
+
+        var addEventUri = new Uri("https://graph.microsoft.com/beta/me/calendar/events");
+        var addEventContent = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var addEventResponse = await httpClient.PostAsync(addEventUri, addEventContent);
+
+        if (addEventResponse.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Event has been added successfully!");
+        }
+        else
+        {
+            Console.WriteLine(addEventResponse.StatusCode);
+        }
+    }
+    public async Task OnChanged(AppointmentData appointment)
+    {
+        /////////// Update an Event \\\\\\\\\\\\\\\\\\
+        var editEventID = appointment.Id;
+        // Format dates according to the desired structure
+        var formattedStart = appointment.Start.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+        var formattedEnd = appointment.End.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+        var json = JsonConvert.SerializeObject(new
+        {
+            subject = appointment.Subject,
+            start = new
+            {
+                dateTime = formattedStart,
+                timeZone = appointment.Start.ToString("zzz")
+            },
+            end = new
+            {
+                dateTime = formattedEnd,
+                timeZone = appointment.End.ToString("zzz")
+            },
+            // description = newEvent.Description,
+            location = new
+            {
+                displayname = appointment.Location
+            }
+            // IsAllDay    = newEvent.IsAllDay
+        });
+
+        Uri editEventUri = new Uri($"https://graph.microsoft.com/beta/me/events/{editEventID}");
+        HttpContent editEventContent = new StringContent(json, Encoding.UTF8, "application/json");
+        HttpResponseMessage editEventResponse = await httpClient.PatchAsync(editEventUri, editEventContent);
+        if (editEventResponse.IsSuccessStatusCode)
+            Console.WriteLine("Event has been updated successfully!");
+        else
+            Console.WriteLine(editEventResponse.StatusCode);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        await GetAllEvents();
+
+    }
+    private async Task GetAllEvents()
+    {
+        try
+        {
+          /////////////////// List Events ///////////////
+            // HttpResponseMessage getEvents = await httpClient.GetAsync("https://graph.microsoft.com/beta/me/calendar/events");
+            HttpResponseMessage getEvents = await httpClient.GetAsync("https://graph.microsoft.com/v1.0/me/events");
+
+            if (getEvents.IsSuccessStatusCode)
+            {
+                DataSource = new List<AppointmentData>
+                {
+                    //new AppointmentData { EventID = "1", EventSubject = "Paris", EventStart = new DateTime(2024, 2, 9, 10, 0, 0) , EventEnd = new DateTime(2024, 2, 10, 12, 0, 0) },
+                    new AppointmentData { Id = "1", Subject = "Paris", Start = new DateTime(2024, 2, 9, 10, 0, 0) , End = new DateTime(2024, 2, 10, 12, 0, 0) },
+                    //new AppointmentData { EventID = "2", EventSubject = "Germany", EventStart = new DateTime(2024, 2, 11, 10, 0, 0) , EventEnd = new DateTime(2024, 2, 12, 10, 0, 0) }
+                    new AppointmentData { Id = "2", Subject = "Germany", Start = new DateTime(2024, 2, 11, 10, 0, 0) , End = new DateTime(2024, 2, 12, 10, 0, 0) }
+                };
+                string jsonResponse = await getEvents.Content.ReadAsStringAsync();
+
+                // Deserialize the JSON response into a list of dynamic objects
+                var events = JsonConvert.DeserializeAnonymousType(jsonResponse, new { value = new List<CalenderEvents>() });
+
+                foreach (var eventData in events.value)
+                {
+                    var appointment = new AppointmentData();
+                    appointment.Id = eventData.Id;
+                    appointment.Subject = eventData.Subject;
+                    appointment.Start = (eventData.Start.DateTime);
+                    appointment.End = eventData.End.DateTime;
+                    // appointment.Location = eventData.Location
+                    DataSource.Add(appointment);
+                }
+            }
+        }
+
+        catch (Exception ex)
+        {
+            throw ex.InnerException;
+        }
+    }
+    public async Task DeleteEvent(AppointmentData appointment)
+    {
+       ///////////////////// Delete an event ///////////////
+        var removeEventID = appointment.Id;
+        Uri removeEventUri = new Uri($"https://graph.microsoft.com/beta/me/events/{removeEventID}");
+
+        HttpResponseMessage deleteResponse = await httpClient.DeleteAsync(removeEventUri);
+
+        if (deleteResponse.IsSuccessStatusCode)
+            Console.WriteLine("Event has been deleted successfully!");
+        else
+            Console.WriteLine(deleteResponse.StatusCode);
+    }
+} *@
+
+
+@* @inject IHttpClientFactory HttpClientFactory *@
+
+
+@* <SfSchedule TValue="AppointmentData">
+    <ScheduleEventSettings DataSource="@DataSource"></ScheduleEventSettings>
+</SfSchedule> *@
+
+@* <SfSchedule TValue="AppointmentData" SelectedDate="@(DateTime.Today)" CurrentView="View.Month">
+    <!-- Define different views for the schedule -->
+    <ScheduleViews>
+        <ScheduleView Option="View.Day" StartHour="07:00" EndHour="15:00"></ScheduleView>
+        <ScheduleView Option="View.Week" StartHour="10:00" EndHour="18:00"></ScheduleView>
+        <ScheduleView Option="View.Month" ShowWeekend="false"></ScheduleView>
+    </ScheduleViews>
+
+    <!-- Handle events triggered by the schedule -->
+    <ScheduleEvents TValue="AppointmentData"></ScheduleEvents>
+
+    <!-- Define how the schedule events should be displayed -->
+    <ScheduleEventSettings DataSource="@DataSource">
+        <!-- Map AppointmentData class properties to schedule fields -->
+        <ScheduleField Id="Id">
+            <FieldSubject Name="Subject"></FieldSubject>
+            <FieldStartTime Name="Start"></FieldStartTime>
+            <FieldEndTime Name="End"></FieldEndTime>
+            <FieldDescription Name="Description"></FieldDescription>
+            <FieldLocation Name="Location"></FieldLocation>
+            <FieldIsAllDay Name="IsAllDay"></FieldIsAllDay>
+            <!-- Add other necessary field mappings here -->
         </ScheduleField>
     </ScheduleEventSettings>
 </SfSchedule>
 
 
- *@
 
-@* @code {
+
+@code
+{
+    private HttpClient httpClient;
+    string DisplayName = string.Empty;
+    List<claenders> AllCalendars = new List<claenders>();
     List<AppointmentData> DataSource = new List<AppointmentData>();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var accessToken = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.Read" });
+            httpClient = HttpClientFactory.CreateClient();
+            //var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.Read" });
+            var token = "EwCAA8l6BAAUs5+HQn0N+h2FxWzLS31ZgQVuHsYAAXiDktTefR5YaWvdh1xBzFZBgoZRmD9n3yFE+BZJhin0HfIRV316ZUxsg+OocKsMPSjFCCfUc9DFTqC+NX8PWMV0n6gZk2IIrIEnqSHPyUUPAxi0Otw4LL9jbIyoVWfP5wVNFk8/yX+6Gr5HEvSjXfLbLKjRjTVBybsmLcnJv86nzy/jUrXNeihJ7PYXmOn0yqcfCHd74+F16/RA2vXqyOwHwWxFLgqgJclwQpYTgCm1ZP/C0q3LHuqJhke23LprNHmfBK7pdxABVFSCr8ZTEDTF4xOPHWbNEJYWvmqE/dNQMIaEy+UnX5OYYUwtdo3lQOsBCuZb/wXSUgZFzvpJXBwDZgAACH//ikfi1cOwUALhejhvJJbkK1SyyzUigK+R9GOiDJrsnsRZaKxy6+ZKX9RIytH4KpxsEO5fRlXTvdtlsC1oTKsSD3lWMnbgiSjSgC53zwploySdMNBIFs2BAj9L2B05731YlxOH8uv3/Dhbf5JUCrCyJVzfnxCZ0wzVxQCE5hAXURphZDDwv1bNiE0PbocXpp36/o/aZ2govYYO6CitjEAgKRdT7RQDEgFq+JBh+3iNNyHQ0d4sOpfcw03do/S6zM8xlsUaAkbejOp5x3+UGF4w+vb+A0XtAUl1OMXpLdLty8wWIR2XYa5c5IK4Q3Z96aFoLxww2acTn1piI0CJTRhjBLh/LeCHuLEDsVTrX9ACZUvEOZe9c9cLlEvTQWFGzmlu7RKphk79LP46y+iOF6rODATY+zMSGT/WGNkzRLhVcmajqAYfvb12hbs3nr1Xf8ruVOrjHqOqMwATf0LgGFlwM0dDmId8I+OICqB8jTJxi9rdyXlTmU652SljJPNgTGOar/7G3ylfQju9m6hT+reaymS/qYDfs+//bhlfNp/m2ZTiQzMox4AlLbx2KdG1yAq0W/F8AyrOGnasgcyxD5dZFRc/lDqX56aaWAlOXU48KHNddw9XpbvFET7WIGXuOWJcMy/QmR2CjIfWNAiw5mjNLr6OOOaZASk4oiZ1t1B68vm//kAvJyqQGVk2tal2/yDhWDtKgHYxDLriDzZhYUdBu1c0FC2tXvHW3fDpZZ+Tvr3hF0rszAb5nrP/+a+go/Af2CUQwmjpYAU8+W6xo9+LKr2RhJNxCz/HiAI=";
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            if (!string.IsNullOrEmpty(accessToken))
+            /////////////////// List Events ///////////////
+            HttpResponseMessage getEvents = await httpClient.GetAsync("https://graph.microsoft.com/beta/me/calendar/events");
+
+            if (getEvents.IsSuccessStatusCode)
             {
-                var graphServiceClient = new GraphServiceClient(
-                    new DelegateAuthenticationProvider(
-                        async (requestMessage) =>
-                        {
-                            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-                        }));
+                string json = await getEvents.Content.ReadAsStringAsync();
+                JObject result = JsonConvert.DeserializeObject(json) as JObject;
 
-                var events = await graphServiceClient.Me.Events
-                    .Request()
-                    .Select(e => new { e.Subject, e.Start, e.End })
-                    .GetAsync();
-
-                foreach (var graphEvent in events)
+                foreach (JProperty child in result.Properties().Where(p => !p.Name.StartsWith("@")))
                 {
-                    DataSource.Add(new AppointmentData
-                        {
-                            EventSubject = graphEvent.Subject,
-                            EventStart = DateTime.Parse(graphEvent.Start.DateTime),
-                            EventEnd = DateTime.Parse(graphEvent.End.DateTime)
-                        });
+                    AllCalendars = child.Value.ToObject<List<claenders>>();
+                    @foreach (var calendars in AllCalendars)
+                    {
+                        var appointment = new AppointmentData();
+                        // appointment.Subject = calendar.AdditionalData["subject"].ToString();
+                        // appointment.StartTime = (DateTime)JObject.Parse(calendar.AdditionalData["start"].ToString())["dateTime"];
+                        // appointment.EndTime = (DateTime)JObject.Parse(calendar.AdditionalData["end"].ToString())["dateTime"];
+                        appointment.Subject = calendars.Subject;
+                        appointment.StartTime = calendars.StartTime;
+                        appointment.EndTime = calendars.EndTime;
+                        DataSource.Add(appointment);
+                    }
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"An error occurred while fetching calendar events: {ex.Message}");
+            throw ex.InnerException;
         }
     }
 
     public class AppointmentData
     {
-        public string EventSubject { get; set; }
-        public DateTime EventStart { get; set; }
-        public DateTime EventEnd { get; set; }
+        public string Subject { get; set; }
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
     }
+
+        public class claenders
+    {
+        public string Subject { get; set; }
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+    }
+} *@
+
+
+@page "/calendar2"
+
+@using Microsoft.Identity.Web
+@using System.Net.Http.Headers
+@using Newtonsoft.Json.Linq
+@using System.Linq
+@using System.Net.Http
+@using Newtonsoft.Json
+@using System.Collections.Generic
+@using System.Text
+@inject IHttpClientFactory HttpClientFactory
+
+<h3>Calendar Events</h3>
+
+@if (DataSource != null && DataSource.Any())
+{
+    <SfSchedule TValue="AppointmentData" SelectedDate="DateTime.Today" CurrentView="View.Month">
+        <!-- Define different views for the schedule -->
+        <ScheduleViews>
+            <ScheduleView Option="View.Day" StartHour="07:00" EndHour="15:00"></ScheduleView>
+            <ScheduleView Option="View.Week" StartHour="10:00" EndHour="18:00"></ScheduleView>
+            <ScheduleView Option="View.Month" ShowWeekend="false"></ScheduleView>
+        </ScheduleViews>
+
+        <!-- Handle events triggered by the schedule -->
+        <ScheduleEvents TValue="AppointmentData" ActionCompleted="OnActionCompleted"></ScheduleEvents>
+
+        <!-- Define how the schedule events should be displayed -->
+        <ScheduleEventSettings DataSource="@DataSource">
+            <!-- Map AppointmentData class properties to schedule fields -->
+            <ScheduleField Id="Id">
+                <FieldSubject Name="Subject"></FieldSubject>
+                <FieldStartTime Name="StartTime"></FieldStartTime>
+                <FieldEndTime Name="EndTime"></FieldEndTime>
+                <!-- Add other necessary field mappings here -->
+            </ScheduleField>
+        </ScheduleEventSettings>
+    </SfSchedule>
 }
- *@
+else
+{
+    <p>No events found.</p>
+}
 
+@code {
+    private List<AppointmentData> DataSource;
+    private HttpClient httpClient;
+    string DisplayName = string.Empty;
 
-@* @code {
-    List<AppointmentData> DataSource = new List<AppointmentData>();
+    [Inject]
+    private ITokenAcquisition TokenAcquisition { get; set; }
 
+    //give the list of events
     protected override async Task OnInitializedAsync()
     {
-        var accessToken = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.Read" });
-
-        if (!string.IsNullOrEmpty(accessToken))
+        try
         {
-            var graphServiceClient = new GraphServiceClient(
-                new DelegateAuthenticationProvider(
-                    async (requestMessage) =>
-                    {
-                        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-                    }));
+            var token = await TokenAcquisition.GetAccessTokenForUserAsync(new[] { "Calendars.Read" });
 
-            try
+            using (httpClient = new HttpClient())
             {
-                var events = await graphServiceClient.Me.Calendar.Events
-                    .Request()
-                    .Select(e => new { e.Subject, e.Start, e.End })
-                    .GetAsync();
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-                foreach (var graphEvent in events)
+                var getEvents = await httpClient.GetAsync("https://graph.microsoft.com/v1.0/me/calendar/events");
+
+                if (getEvents.IsSuccessStatusCode)
                 {
-                    DataSource.Add(new AppointmentData
+                    var json = await getEvents.Content.ReadAsStringAsync();
+                    var result = JObject.Parse(json);
+
+                    var events = result["value"].ToObject<List<CalendarEvent>>();
+
+                    DataSource = events.Select(e => new AppointmentData
                         {
-                            EventSubject = graphEvent.Subject,
-                            EventStart = DateTime.Parse(graphEvent.Start.DateTime),
-                            EventEnd = DateTime.Parse(graphEvent.End.DateTime)
-                        });
+                            Id = e.Id,
+                            Subject = e.Subject,
+                            StartTime = DateTime.Parse(e.Start.DateTime),
+                            EndTime = DateTime.Parse(e.End.DateTime)
+                        }).ToList();
                 }
             }
-            catch (Exception ex)
+        }
+        catch (Exception ex)
+        {
+            // Handle exception
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    //create event
+    public async Task OnCreated(AppointmentData appointment)
+    {
+        try
+        {
+            httpClient = HttpClientFactory.CreateClient();
+            var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Format dates according to the desired structure
+            var formattedStart = appointment.StartTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+            var formattedEnd = appointment.EndTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+
+            var json = JsonConvert.SerializeObject(new
             {
-                Console.WriteLine($"An error occurred while fetching calendar events: {ex.Message}");
+                subject = appointment.Subject,
+                start = new
+                {
+                    dateTime = formattedStart,
+                    //timeZone = appointment.StartTime.ToString("zzz")
+                    timeZone = "UTC"
+
+                },
+                end = new
+                {
+                    dateTime = formattedEnd,
+                    //timeZone = appointment.EndTime.ToString("zzz")
+                    timeZone = "UTC"
+
+                }
+                // description = newEvent.Description,
+                // location = new
+                // {
+                //     displayname = appointment.Location
+                // }
+                // IsAllDay    = newEvent.IsAllDay
+            });
+
+            var addEventUri = new Uri("https://graph.microsoft.com/beta/me/calendar/events");
+            var addEventContent = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var addEventResponse = await httpClient.PostAsync(addEventUri, addEventContent);
+
+            if (addEventResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Event has been added successfully!");
+                Status = "Added";
             }
+            else
+            {
+                Console.WriteLine(addEventResponse.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"{ex.Message}");
+        }
+    }
+    //update event
+    public async Task OnChanged(AppointmentData appointment)
+    {
+        httpClient = HttpClientFactory.CreateClient();
+        var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        /////////// Update an Event \\\\\\\\\\\\\\\\\\
+        var editEventID = appointment.Id;
+        // Format dates according to the desired structure
+        var formattedStart = appointment.StartTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+        var formattedEnd = appointment.EndTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+        var json = JsonConvert.SerializeObject(new
+        {
+            subject = appointment.Subject,
+            start = new
+            {
+                dateTime = formattedStart,
+                timeZone = appointment.StartTime.ToString("zzz")
+            },
+            end = new
+            {
+                dateTime = formattedEnd,
+                timeZone = appointment.EndTime.ToString("zzz")
+            }
+            // description = newEvent.Description,
+            // location = new
+            // {
+            //     displayname = appointment.Location
+            // }
+            // IsAllDay    = newEvent.IsAllDay
+        });
+
+        Uri editEventUri = new Uri($"https://graph.microsoft.com/beta/me/events/{editEventID}");
+        HttpContent editEventContent = new StringContent(json, Encoding.UTF8, "application/json");
+        HttpResponseMessage editEventResponse = await httpClient.PatchAsync(editEventUri, editEventContent);
+        if (editEventResponse.IsSuccessStatusCode)
+            Console.WriteLine("Event has been updated successfully!");
+        else
+            Console.WriteLine(editEventResponse.StatusCode);
+    }
+
+    //delete event
+    public async Task DeleteEvent(AppointmentData appointment)
+    {
+        httpClient = HttpClientFactory.CreateClient();
+        var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        ///////////////////// Delete an event ///////////////
+        var removeEventID = appointment.Id;
+        Uri removeEventUri = new Uri($"https://graph.microsoft.com/beta/me/events/{removeEventID}");
+
+        HttpResponseMessage deleteResponse = await httpClient.DeleteAsync(removeEventUri);
+
+        if (deleteResponse.IsSuccessStatusCode)
+            Console.WriteLine("Event has been deleted successfully!");
+        else
+            Console.WriteLine(deleteResponse.StatusCode);
+    }
+
+
+    string Status = "";
+    public async Task OnActionCompleted(ActionEventArgs<AppointmentData> args)
+    {
+        if (args.ActionType == ActionType.EventCreate)
+        {
+            Status = "0";
+            await OnCreated(args.AddedRecords[0]);
+        }
+        if (args.ActionType == ActionType.EventChange)
+        {
+            await OnChanged(args.ChangedRecords[0]);
+            Status = "1";
+        }
+        if (args.ActionType == ActionType.EventRemove)
+        {
+            Status = "Success";
+            await DeleteEvent(args.DeletedRecords[0]);
         }
     }
 
     public class AppointmentData
     {
-        public string EventSubject { get; set; }
-        public DateTime EventStart { get; set; }
-        public DateTime EventEnd { get; set; }
+        public string Id{ get; set; }
+        public string Subject { get; set; }
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+    }
+
+    public class CalendarEvent
+    {
+        public string Id { get; set; }
+        public string Subject { get; set; }
+        public EventDateTime Start { get; set; }
+        public EventDateTime End { get; set; }
+    }
+
+    public class EventDateTime
+    {
+        public string DateTime { get; set; }
     }
 }
- *@
