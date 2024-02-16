@@ -1,39 +1,383 @@
-﻿@page "/calender"
+﻿@page "/calendar"
 
-<SfSchedule TValue="AppointmentData" SelectedDate="@(new DateTime(2020, 1, 10))" CurrentView="View.Month">
-<ScheduleViews>
-    <ScheduleView Option="View.Day" StartHour="07:00" EndHour="15:00"></ScheduleView>
-    <ScheduleView Option="View.Week" StartHour="10:00" EndHour="18:00"></ScheduleView>
-    <ScheduleView Option="View.Month" ShowWeekend="false"></ScheduleView>
-</ScheduleViews>
-<ScheduleEventSettings DataSource="@DataSource">
-        <ScheduleField Id="EventID">
-            <FieldSubject Name="EventSubject"></FieldSubject>
-            <FieldStartTime Name="EventStart"></FieldStartTime>
-            <FieldEndTime Name="EventEnd"></FieldEndTime>
-        </ScheduleField>
-    </ScheduleEventSettings>
+@using AzureAdSSR.AccessToken
+@using Microsoft.Identity.Client
+@using Microsoft.Identity.Client.Extensions.Msal
+@using Microsoft.Identity.Web
+@using System.Net.Http.Headers
+@using Newtonsoft.Json.Linq
+@using System.Linq
+@using System.Net.Http
+@using Newtonsoft.Json
+@using System.Collections.Generic
+@using System.Text
+@inject IHttpClientFactory HttpClientFactory
+@inject IJSRuntime JSRuntime
 
-    @* For remote data, uncomment and make use of the below ScheduleEventSettings and remove the previous ScheduleEventSettings *@
-  @*   <ScheduleEventSettings TValue="AppointmentData">
-        <SfDataManager Url="https://js.syncfusion.com/demos/ejservices/api/Schedule/LoadData" Adaptor="@Syncfusion.Blazor.Adaptors.WebApiAdaptor">
-        </SfDataManager>
-    </ScheduleEventSettings> *@
+@attribute [AuthorizeForScopes]
 
-</SfSchedule>
+<h3>Calendar Events</h3>
+
+@if (DataSource != null && DataSource.Any())
+{
+    <SfSchedule TValue="AppointmentData" SelectedDate="DateTime.Today" CurrentView="View.Month" Timezone="@TimezoneValue">
+        <!-- Define different views for the schedule -->
+        <ScheduleViews>
+            <ScheduleView Option="View.Day" StartHour="07:00" EndHour="15:00"></ScheduleView>
+            <ScheduleView Option="View.Week" StartHour="10:00" EndHour="18:00"></ScheduleView>
+            <ScheduleView Option="View.Month" ShowWeekend="false"></ScheduleView>
+        </ScheduleViews>
+
+        <!-- Handle events triggered by the schedule -->
+        <ScheduleEvents TValue="AppointmentData" ActionCompleted="OnActionCompleted"></ScheduleEvents>
+
+        <!-- Define how the schedule events should be displayed -->
+        <ScheduleEventSettings DataSource="@DataSource">
+            <!-- Map AppointmentData class properties to schedule fields -->
+            <ScheduleField Id="Id">
+                <FieldSubject Name="Subject"></FieldSubject>
+                <FieldLocation Name="Location"></FieldLocation>
+                <FieldStartTime Name="StartTime"></FieldStartTime>
+                <FieldEndTime Name="EndTime"></FieldEndTime>
+                <!-- Add other necessary field mappings here -->
+            </ScheduleField>
+        </ScheduleEventSettings>
+    </SfSchedule>
+}
+else
+{
+    <p>No events found.</p>
+}
 
 @code {
-    List<AppointmentData> DataSource = new List<AppointmentData>
+    //public DateTime CurrentDate { get; set; } = new DateTime.Now;
+    private List<AppointmentData> DataSource;
+    private HttpClient httpClient;
+    string DisplayName = string.Empty;
+
+    [Inject]
+    private ITokenAcquisition TokenAcquisition { get; set; }
+    string TimezoneValue;
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        new AppointmentData { EventID = 1, EventSubject = "Paris", EventStart = new DateTime(2020, 1, 10, 10, 0, 0) , EventEnd = new DateTime(2020, 1, 10, 12, 0, 0) },
-        new AppointmentData { EventID = 2, EventSubject = "Germany", EventStart = new DateTime(2020, 1, 13, 10, 0, 0) , EventEnd = new DateTime(2020, 1, 13, 12, 0, 0) }
-    };
+        if (firstRender)
+        {
+            TimezoneValue = await JSRuntime.InvokeAsync<string>("eval", "(function(){try { return ''+ Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e) {} return 'UTC';}())");
+            StateHasChanged();
+        }
+    }
+
+    //give the list of events
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCalendarEvents();
+    }
+
+    //list all calender events
+    public async Task GetCalendarEvents()
+    {
+        var pca = CreatePublicClient("https://login.microsoftonline.com/common");
+        var cacheHelper = await CreateCacheHelperAsync().ConfigureAwait(false);
+        cacheHelper.RegisterCache(pca.UserTokenCache);
+        AuthenticationResult result;
+        try
+        {
+            //TokenService tokenService = new TokenService();
+            //var token = await TokenAcquisition.GetAccessTokenForUserAsync(new[] { "Calendars.Read" });
+            //var token = await TokenService.GetAccessToken(refreshTo.aken, new[] { "Calendars.Read" });
+
+            string[] scopes = new string[]
+            {
+                "User.Read",
+                "Calendars.Read"
+            };
+
+            var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
+            var firstAccount = accounts.FirstOrDefault();
+
+            // this is expected to fail when account is null
+            result = await pca.AcquireTokenSilent(scopes, firstAccount)
+                .ExecuteAsync()
+                .ConfigureAwait(false);
+
+            using (httpClient = new HttpClient())
+            {
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", result.AccessToken);
+
+                var getEvents = await httpClient.GetAsync("https://graph.microsoft.com/v1.0/me/calendar/events");
+
+                if (getEvents.IsSuccessStatusCode)
+                {
+                    var json = await getEvents.Content.ReadAsStringAsync();
+                    var results = JObject.Parse(json);
+
+                    var events = results["value"].ToObject<List<CalendarEvent>>();
+
+                    DataSource = events.Select(e => new AppointmentData
+                        {
+                            Id = e.Id,
+                            Subject = e.Subject,
+                            //Location = e.Location != null ? e.Location : "",
+                            StartTime = DateTime.Parse(e.Start.DateTime),
+                            EndTime = DateTime.Parse(e.End.DateTime),
+                            StartTimezone = TimezoneValue,
+                            EndTimezone = TimezoneValue
+                        }).ToList();
+                }
+            }
+        }
+        catch (MsalUiRequiredException)
+        {
+            var scopes = new[] { "User.Read", "Calendars.Read" };
+            // User interaction is required to acquire a token.
+            // Redirect the user to the sign-in page or prompt them to log in again.
+            result = await pca.AcquireTokenInteractive(scopes)
+                .ExecuteAsync().ConfigureAwait(false);
+            if (result.AccessToken != null)
+            {
+                cacheHelper.RegisterCache(pca.UserTokenCache);
+                var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle exception
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    //create event
+    public async Task OnCreated(AppointmentData appointment)
+    {
+        try
+        {
+            httpClient = HttpClientFactory.CreateClient();
+            var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // Format dates according to the desired structure
+            var formattedStart = appointment.StartTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+            var formattedEnd = appointment.EndTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+
+            var json = JsonConvert.SerializeObject(new
+            {
+                subject = appointment.Subject,
+                start = new
+                {
+                    dateTime = formattedStart,
+                    //timeZone = appointment.StartTime.ToString("zzz")
+                    timeZone = "UTC"
+
+                },
+                end = new
+                {
+                    dateTime = formattedEnd,
+                    //timeZone = appointment.EndTime.ToString("zzz")
+                    timeZone = "UTC"
+
+                }//,
+                 // description = newEvent.Description,
+                 // location = new
+                 // {
+                 //     displayname = appointment.Location
+                 // }
+                 // IsAllDay    = newEvent.IsAllDay
+            });
+
+            var addEventUri = new Uri("https://graph.microsoft.com/beta/me/calendar/events");
+            var addEventContent = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var addEventResponse = await httpClient.PostAsync(addEventUri, addEventContent);
+
+            if (addEventResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Event has been added successfully!");
+                Status = "Added";
+            }
+            else
+            {
+                Console.WriteLine(addEventResponse.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"{ex.Message}");
+        }
+    }
+    //update event
+    public async Task OnChanged(AppointmentData appointment)
+    {
+        httpClient = HttpClientFactory.CreateClient();
+        var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        /////////// Update an Event \\\\\\\\\\\\\\\\\\
+        var editEventID = appointment.Id;
+        // Format dates according to the desired structure
+        var formattedStart = appointment.StartTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+        var formattedEnd = appointment.EndTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
+        var json = JsonConvert.SerializeObject(new
+        {
+            subject = appointment.Subject,
+            start = new
+            {
+                dateTime = formattedStart,
+                //timeZone = appointment.StartTime.ToString("zzz")
+                timeZone = "UTC"
+            },
+            end = new
+            {
+                dateTime = formattedEnd,
+                //timeZone = appointment.EndTime.ToString("zzz")
+                timeZone = "UTC"
+            }//,
+             // description = newEvent.Description,
+             // location = new
+             // {
+             //     displayname = appointment.Location
+             // }
+             // IsAllDay    = newEvent.IsAllDay
+        });
+
+        Uri editEventUri = new Uri($"https://graph.microsoft.com/beta/me/events/{editEventID}");
+        HttpContent editEventContent = new StringContent(json, Encoding.UTF8, "application/json");
+        HttpResponseMessage editEventResponse = await httpClient.PatchAsync(editEventUri, editEventContent);
+        if (editEventResponse.IsSuccessStatusCode)
+            Console.WriteLine("Event has been updated successfully!");
+        else
+            Console.WriteLine(editEventResponse.StatusCode);
+    }
+
+    //delete event
+    public async Task DeleteEvent(AppointmentData appointment)
+    {
+        httpClient = HttpClientFactory.CreateClient();
+        var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        ///////////////////// Delete an event ///////////////
+        var removeEventID = appointment.Id;
+        Uri removeEventUri = new Uri($"https://graph.microsoft.com/beta/me/events/{removeEventID}");
+
+        HttpResponseMessage deleteResponse = await httpClient.DeleteAsync(removeEventUri);
+
+        if (deleteResponse.IsSuccessStatusCode)
+            Console.WriteLine("Event has been deleted successfully!");
+        else
+            Console.WriteLine(deleteResponse.StatusCode);
+    }
+
+
+    string Status = "";
+    public async Task OnActionCompleted(ActionEventArgs<AppointmentData> args)
+    {
+        if (args.ActionType == ActionType.EventCreate)
+        {
+            Status = "0";
+            await OnCreated(args.AddedRecords[0]);
+        }
+        if (args.ActionType == ActionType.EventChange)
+        {
+            await OnChanged(args.ChangedRecords[0]);
+            Status = "1";
+        }
+        if (args.ActionType == ActionType.EventRemove)
+        {
+            Status = "Success";
+            await DeleteEvent(args.DeletedRecords[0]);
+        }
+    }
+
+    private static IPublicClientApplication CreatePublicClient(string authority)
+    {
+        var appBuilder = PublicClientApplicationBuilder.Create("2905e667-8b84-4def-b3d4-fab26dd4f702") // DO NOT USE THIS CLIENT ID IN YOUR APP!!!! WE WILL DELETE IT!
+            .WithAuthority(authority)
+            .WithRedirectUri("http://localhost"); // make sure to register this redirect URI for the interactive login to work
+
+        var app = appBuilder.Build();
+        Console.WriteLine($"Built public client");
+
+        return app;
+    }
+
+    private static async Task<MsalCacheHelper> CreateCacheHelperAsync()
+    {
+        StorageCreationProperties storageProperties;
+
+        try
+        {
+            storageProperties = new StorageCreationPropertiesBuilder(
+                "token_cache.txt",
+                MsalCacheHelper.UserRootDirectory)
+            // .WithLinuxKeyring(
+            //     Config.LinuxKeyRingSchema,
+            //     Config.LinuxKeyRingCollection,
+            //     Config.LinuxKeyRingLabel,
+            //     Config.LinuxKeyRingAttr1,
+            //     Config.LinuxKeyRingAttr2)
+            // .WithMacKeyChain(
+            //     Config.KeyChainServiceName,
+            //     Config.KeyChainAccountName)
+            .WithCacheChangedEvent( // do NOT use unless really necessary, high perf penalty!
+                "2905e667-8b84-4def-b3d4-fab26dd4f702",
+                "https://login.microsoftonline.com/common")
+            .Build();
+
+            var cacheHelper = await MsalCacheHelper.CreateAsync(
+                storageProperties).ConfigureAwait(false);
+
+            cacheHelper.VerifyPersistence();
+            return cacheHelper;
+
+        }
+        catch (MsalCachePersistenceException e)
+        {
+            Console.WriteLine($"WARNING! Unable to encrypt tokens at rest." +
+                $" Saving tokens in plaintext at {Path.Combine(MsalCacheHelper.UserRootDirectory, "token_cache.txt")} ! Please protect this directory or delete the file after use");
+            Console.WriteLine($"Encryption exception: " + e);
+
+            storageProperties =
+                new StorageCreationPropertiesBuilder(
+                    "token_cache.txt" + ".plaintext", // do not use the same file name so as not to overwrite the encypted version
+                    MsalCacheHelper.UserRootDirectory)
+                .WithUnprotectedFile()
+                .Build();
+
+            var cacheHelper = await MsalCacheHelper.CreateAsync(storageProperties).ConfigureAwait(false);
+            cacheHelper.VerifyPersistence();
+
+            return cacheHelper;
+        }
+    }
+
     public class AppointmentData
     {
-        @*Change the below field names to default field name values like Id, Subject, StartTime and EndTime, while binding the above remote url service to the Scheduler*@
-        public int EventID { get; set; }
-        public string EventSubject { get; set; }
-        public DateTime EventStart { get; set; }
-        public DateTime EventEnd { get; set; }
+        public string Id { get; set; }
+        public string Subject { get; set; }
+        //public string Location { get; set; }
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public string StartTimezone { get; set; }
+        public string EndTimezone { get; set; }
+    }
+
+    public class CalendarEvent
+    {
+        public string Id { get; set; }
+        public string Subject { get; set; }
+        public EventDateTime Start { get; set; }
+        public EventDateTime End { get; set; }
+        //public EventDateTime StartTimeZ { get; set; }
+        //public EventDateTime EndTimeZ { get; set; }
+    }
+
+    public class EventDateTime
+    {
+        public string DateTime { get; set; }
     }
 }

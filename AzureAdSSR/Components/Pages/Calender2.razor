@@ -537,12 +537,14 @@ else
             start = new
             {
                 dateTime = formattedStart,
-                timeZone = appointment.StartTime.ToString("zzz")
+                //timeZone = appointment.StartTime.ToString("zzz")
+                timeZone = "UTC"
             },
             end = new
             {
                 dateTime = formattedEnd,
-                timeZone = appointment.EndTime.ToString("zzz")
+                //timeZone = appointment.EndTime.ToString("zzz")
+                timeZone = "UTC"
             }
             // description = newEvent.Description,
             // location = new

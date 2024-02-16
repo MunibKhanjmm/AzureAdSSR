@@ -8,6 +8,7 @@ using AzureAdSSR.AccessToken;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using System.ComponentModel.Design;
 
 namespace AzureAdSSR
 {
@@ -24,18 +25,21 @@ namespace AzureAdSSR
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
-            // Add services to the container.
-            //builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
-            //   .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
-            //   .EnableTokenAcquisitionToCallDownstreamApi(initialScopes)
-            //   .AddMicrosoftGraph(builder.Configuration.GetSection("initialScopes"))
-            //   .AddInMemoryTokenCaches();
-            builder.Services.AddMicrosoftIdentityWebAppAuthentication(builder.Configuration)
-            .EnableTokenAcquisitionToCallDownstreamApi(new[] { "Calendars.Read", "Calendars.ReadWrite" })
-            .AddMicrosoftGraph(builder.Configuration.GetSection("MicrosoftGraph"))
-            .AddInMemoryTokenCaches();
+            //Register Syncfusion license
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjHTQxAR8/V1NAaF1cXmhLYVJ/WmFZfVpgdV9GYVZRR2YuP1ZhSXxXdkdiW39fcHVVRWhUUUY=");
 
-            //builder.Services.AddScoped<TokenProvider>();
+            builder.Services.AddMicrosoftIdentityWebAppAuthentication(builder.Configuration)
+            .EnableTokenAcquisitionToCallDownstreamApi(new[] { "Calendars.Read", "Calendars.ReadWrite","User.Read" })
+            .AddMicrosoftGraph(builder.Configuration.GetSection("MicrosoftGraph"))
+            .AddInMemoryTokenCaches()
+              .AddDistributedTokenCaches();
+
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = builder.Configuration.GetConnectionString("Redis");
+                options.InstanceName = "RedisDemos_"; // unique to the app
+            });
+
 
             builder.Services.AddControllersWithViews(options =>
             {
