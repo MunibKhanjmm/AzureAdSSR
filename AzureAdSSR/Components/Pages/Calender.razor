@@ -14,7 +14,8 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JSRuntime
 
-@attribute [AuthorizeForScopes]
+@* 
+@attribute [AuthorizeForScopes] *@
 
 <h3>Calendar Events</h3>
 
@@ -88,11 +89,7 @@ else
             //var token = await TokenAcquisition.GetAccessTokenForUserAsync(new[] { "Calendars.Read" });
             //var token = await TokenService.GetAccessToken(refreshTo.aken, new[] { "Calendars.Read" });
 
-            string[] scopes = new string[]
-            {
-                "User.Read",
-                "Calendars.Read"
-            };
+            string[] scopes = new string[]{"User.Read","Calendars.Read"};
 
             var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
             var firstAccount = accounts.FirstOrDefault();
@@ -151,12 +148,27 @@ else
     //create event
     public async Task OnCreated(AppointmentData appointment)
     {
+        var pca = CreatePublicClient("https://login.microsoftonline.com/common");
+        var cacheHelper = await CreateCacheHelperAsync().ConfigureAwait(false);
+        cacheHelper.RegisterCache(pca.UserTokenCache);
+        AuthenticationResult result;
         try
         {
-            httpClient = HttpClientFactory.CreateClient();
-            var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+            string[] scopes = new string[] { "User.Read", "Calendars.ReadWrite" };
 
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
+            var firstAccount = accounts.FirstOrDefault();
+
+            // this is expected to fail when account is null
+            result = await pca.AcquireTokenSilent(scopes, firstAccount)
+                .ExecuteAsync()
+                .ConfigureAwait(false);
+
+
+            httpClient = HttpClientFactory.CreateClient();
+            //var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", result.AccessToken);
 
             // Format dates according to the desired structure
             var formattedStart = appointment.StartTime.ToString("yyyy-MM-ddTHH:mm:ss.fffzzz");
@@ -210,10 +222,27 @@ else
     //update event
     public async Task OnChanged(AppointmentData appointment)
     {
-        httpClient = HttpClientFactory.CreateClient();
-        var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
 
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var pca = CreatePublicClient("https://login.microsoftonline.com/common");
+        var cacheHelper = await CreateCacheHelperAsync().ConfigureAwait(false);
+        cacheHelper.RegisterCache(pca.UserTokenCache);
+        AuthenticationResult result;
+
+        string[] scopes = new string[] { "User.Read", "Calendars.ReadWrite" };
+
+        var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
+        var firstAccount = accounts.FirstOrDefault();
+
+        // this is expected to fail when account is null
+        result = await pca.AcquireTokenSilent(scopes, firstAccount)
+            .ExecuteAsync()
+            .ConfigureAwait(false);
+
+
+        httpClient = HttpClientFactory.CreateClient();
+        //var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", result.AccessToken);
 
         /////////// Update an Event \\\\\\\\\\\\\\\\\\
         var editEventID = appointment.Id;
@@ -255,10 +284,25 @@ else
     //delete event
     public async Task DeleteEvent(AppointmentData appointment)
     {
-        httpClient = HttpClientFactory.CreateClient();
-        var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+        var pca = CreatePublicClient("https://login.microsoftonline.com/common");
+        var cacheHelper = await CreateCacheHelperAsync().ConfigureAwait(false);
+        cacheHelper.RegisterCache(pca.UserTokenCache);
+        AuthenticationResult result;
 
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        string[] scopes = new string[] { "User.Read", "Calendars.ReadWrite" };
+
+        var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
+        var firstAccount = accounts.FirstOrDefault();
+
+        // this is expected to fail when account is null
+        result = await pca.AcquireTokenSilent(scopes, firstAccount)
+            .ExecuteAsync()
+            .ConfigureAwait(false);
+
+        httpClient = HttpClientFactory.CreateClient();
+        //var token = await TokenAcquisition.GetAccessTokenForUserAsync(new string[] { "Calendars.ReadWrite" });
+
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", result.AccessToken);
 
         ///////////////////// Delete an event ///////////////
         var removeEventID = appointment.Id;
